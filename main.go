@@ -2,44 +2,60 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
+	"github.com/Ishaandham19/urlShortner/handlers"
 	"github.com/gorilla/mux"
 )
 
 func main() {
-	l := log.New(os.Stdout, "authentication", log.LstdFlags)
+	l := log.New(os.Stdout, "Auth Example ", log.LstdFlags)
 
 	// create a new serve mux and register and handlers
 	sm := mux.NewRouter()
 
-	// handlers
-	sh := handlers.Secret()
-	oh := handlers.Open()
+	h := handlers.NewAuthHandler(l)
+
+	sm.HandleFunc("/", h.Open)
+	sm.HandleFunc("/secret", h.Secret)
 
 	// handlers for API
+	// sm.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+	// 	if req.URL.Path != "/" {
+	// 		http.NotFound(w, req)
+	// 		return
+	// 	}
+	// 	fmt.Fprintf(w, "Unauth API!\n")
+	// })
+
+	// sm.HandleFunc("/auth", func(w http.ResponseWriter, req *http.Request) {
+	// 	if req.URL.Path != "/" {
+	// 		http.NotFound(w, req)
+	// 		return
+	// 	}
+	// 	fmt.Fprintf(w, "Auth API!\n")
+	// })
 
 	// create a new server
 	s := http.Server{
-		Addr:         "9090",            // configure the bind address
-		Handler:      sm,                // set the default handler
-		ErrorLog:     l,                 // set the logger for the server
-		ReadTimeout:  5 * time.Second,   // max time to read request from the client
-		WriteTimeout: 10 * time.Second,  // max time to write response to the client
-		IdleTimeout:  120 * time.Second, // max time for connections using TCP Keep-Alive
+		Addr:    "9090", // configure the bind address
+		Handler: sm,     // set the default handler
+		TLSConfig: &tls.Config{
+			MinVersion:               tls.VersionTLS13,
+			PreferServerCipherSuites: true,
+		},
 	}
 
 	// start the server
 	go func() {
-		l.Println("Starting on port 9090")
-
 		err := s.ListenAndServe()
 		if err != nil {
-			l.Printf("Error starting server: %s\n", err)
+			log.Fatal("Error starting server: %s\n", err)
 			os.Exit(1)
 		}
 	}()
