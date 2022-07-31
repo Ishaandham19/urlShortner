@@ -6,14 +6,13 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/Ishaandham19/urlShortner/models"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
-	"github.com/jinzhu/gorm"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 type User struct {
@@ -38,42 +37,41 @@ func TestAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 func (u *User) Login(w http.ResponseWriter, r *http.Request) {
-	user := &models.User{}
-	err := json.NewDecoder(r.Body).Decode(user)
+	curUser := &models.User{}
+	err := json.NewDecoder(r.Body).Decode(curUser)
 
 	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
 		var resp = map[string]interface{}{"status": false, "message": "Invalid request"}
 		json.NewEncoder(w).Encode(resp)
 		return
 	}
-	resp := u.ValidateUser(user)
-	json.NewEncoder(w).Encode(resp)
-}
 
-func (u *User) ValidateUser(curUser *models.User) map[string]interface{} {
-	user := &models.User{}
-	log.Println(curUser.UserName)
-
-	err := u.db.Where("user_name = ?", curUser.UserName).First(&user)
-	if err.Error != nil {
-		log.Println(err.Error.Error())
+	var user models.User
+	u.db.First(&user, "user_name = ?", curUser.UserName)
+	if user.ID == 0 {
+		w.WriteHeader(http.StatusBadRequest)
 		var resp = map[string]interface{}{"status": false, "message": "Username not found"}
-		return resp
+		json.NewEncoder(w).Encode(resp)
+		return
 	}
-	// Sets expiration of token to 27.78 days
-	expiresAt := time.Now().Add(time.Minute * 100000).Unix()
+
+	// Sets expiration of token to 30 days
+	expiresAt := time.Now().AddDate(0, 1, 0)
 
 	errf := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(curUser.Password))
-	if errf != nil && errf == bcrypt.ErrMismatchedHashAndPassword { //Password does not match!
+	if errf != nil && errf == bcrypt.ErrMismatchedHashAndPassword { // Password does not match!
+		w.WriteHeader(http.StatusBadRequest)
 		var resp = map[string]interface{}{"status": false, "message": "Invalid login credentials. Please try again"}
-		return resp
+		json.NewEncoder(w).Encode(resp)
+		return
 	}
 
 	tk := &models.Token{
 		UserID: user.ID,
 		Name:   user.UserName,
 		StandardClaims: &jwt.StandardClaims{
-			ExpiresAt: expiresAt,
+			ExpiresAt: expiresAt.Unix(),
 		},
 	}
 
@@ -86,8 +84,11 @@ func (u *User) ValidateUser(curUser *models.User) map[string]interface{} {
 
 	var resp = map[string]interface{}{"status": true, "message": "logged in"}
 
+	cookie := &http.Cookie{Name: "Authorization", Value: tokenString, Expires: expiresAt, HttpOnly: true}
+	http.SetCookie(w, cookie)
 	resp["token"] = tokenString // Store the token in the response
-	return resp
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (u *User) CreateUser(w http.ResponseWriter, r *http.Request) {
@@ -103,10 +104,10 @@ func (u *User) CreateUser(w http.ResponseWriter, r *http.Request) {
 	pass, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		fmt.Println(err)
-		err := ErrorResponse{
-			Err: "Password Encryption failed",
-		}
-		json.NewEncoder(w).Encode(err)
+		w.WriteHeader(http.StatusBadRequest)
+		var resp = map[string]interface{}{"status": false, "message": "Invalid request"}
+		json.NewEncoder(w).Encode(resp)
+		return
 	}
 
 	user.Password = string(pass)
@@ -116,17 +117,34 @@ func (u *User) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	if createdUser.Error != nil {
 		fmt.Println(errMessage)
+		w.WriteHeader(http.StatusBadRequest)
+		var resp = map[string]interface{}{"status": false, "message": "Failed to create user"}
+		json.NewEncoder(w).Encode(resp)
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
 	var resp = map[string]interface{}{"status": true, "message": "Successful registration"}
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (u *User) GetUserFromJWT(w http.ResponseWriter, r *http.Request) {
+	authUser := r.Context().Value("user").(*models.Token)
+
+	var user models.User
+	u.db.First(&user, "user_name = ?", authUser.Name)
+	if user.ID == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		var resp = map[string]interface{}{"status": false, "message": "Username not found"}
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+	json.NewEncoder(w).Encode(user)
 }
 
 func (u *User) FetchUsers(w http.ResponseWriter, r *http.Request) {
 	var users []models.User
 	u.db.Find(&users)
-
 	json.NewEncoder(w).Encode(users)
 }
 
@@ -147,23 +165,4 @@ func (u *User) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	u.db.First(&user, id)
 	u.db.Delete(&user)
 	json.NewEncoder(w).Encode("User deleted")
-}
-
-func (u *User) GetUser(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id, err := strconv.ParseUint(params["id"], 10, 64)
-	fmt.Println(id)
-	if err != nil {
-		var resp = map[string]interface{}{"status": false, "message": "Illegal request"}
-		json.NewEncoder(w).Encode(resp)
-		return
-	}
-	var user models.User
-	if err := u.db.First(&user, id); err != nil {
-		log.Print(err.Error.Error())
-		var resp = map[string]interface{}{"status": false, "message": "No records found"}
-		json.NewEncoder(w).Encode(resp)
-		return
-	}
-	json.NewEncoder(w).Encode(&user)
 }

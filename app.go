@@ -7,9 +7,9 @@ import (
 
 	"github.com/Ishaandham19/urlShortner/models"
 	"github.com/gorilla/mux"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/postgres" // Gorm postgres dialect interface
 	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 type App struct {
@@ -28,7 +28,7 @@ func (a *App) ConnectDb(username, password, databaseName, databaseHost string) {
 	dbURI := fmt.Sprintf("host=%s user=%s dbname=%s sslmode=disable password=%s", databaseHost, username, databaseName, password)
 
 	// Connect to db URI
-	db, err := gorm.Open("postgres", dbURI)
+	db, err := gorm.Open(postgres.Open(dbURI), &gorm.Config{})
 
 	// Add db to App struct
 	a.Db = db
