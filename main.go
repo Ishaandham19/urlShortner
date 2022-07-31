@@ -1,55 +1,43 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 
-	"github.com/Ishaandham19/urlShortner/handlers"
-	"github.com/gorilla/mux"
+	"github.com/Ishaandham19/urlShortner/controllers"
+	"github.com/Ishaandham19/urlShortner/routes"
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	l := log.New(os.Stdout, "Auth Example ", log.LstdFlags)
+	e := godotenv.Load()
 
-	// create a new serve mux and register and handlers
-	h := handlers.NewAuthHandler(l)
+	if e != nil {
+		log.Fatal("Error loading .env file")
+	}
+	fmt.Println(e)
 
-	r := mux.NewRouter()
-	r.HandleFunc("/", h.Open)
-	r.HandleFunc("/auth", h.Auth)
-	http.Handle("/", r)
+	port := os.Getenv("PORT")
+	username := os.Getenv("databaseUser")
+	password := os.Getenv("databasePassword")
+	databaseName := os.Getenv("databaseName")
+	databaseHost := os.Getenv("databaseHost")
 
-	http.ListenAndServe(":9090", r)
-	// // create a new server
-	// s := http.Server{
-	// 	Addr:    ":9090", // configure the bind address
-	// 	Handler: m,       // set the default handler
-	// 	TLSConfig: &tls.Config{
-	// 		MinVersion:               tls.VersionTLS13,
-	// 		PreferServerCipherSuites: true,
-	// 	},
-	// }
+	// Connect to database
+	app := App{}
+	app.ConnectDb(username, password, databaseName, databaseHost)
 
-	// // start the server
-	// go func() {
-	// 	err := s.ListenAndServe()
-	// 	if err != nil {
-	// 		log.Fatal("Error starting server: ", err)
-	// 		os.Exit(1)
-	// 	}
-	// }()
+	// Create handlers
+	user := controllers.NewUser(app.Db, log.Default())
 
-	// // trap sigterm or interrupt and gracefully shutdown server
-	// c := make(chan os.Signal, 1)
-	// signal.Notify(c, os.Interrupt)
-	// signal.Notify(c, os.Kill)
+	app.Router = routes.Handlers(user)
 
-	// // Block until signal is received
-	// sig := <-c
-	// log.Println("Got signal:", sig)
+	// Handle routes
+	http.Handle("/", app.Router)
 
-	// // gracefully shutdown the server, waiting max 30 seconds for current operations to complete
-	// ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	// s.Shutdown(ctx)
+	// serve
+	log.Printf("Server up on port '%s'", port)
+	app.Run("", port)
 }
