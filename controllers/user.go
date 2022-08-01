@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Ishaandham19/urlShortner/models"
@@ -79,7 +80,11 @@ func (u *User) Login(w http.ResponseWriter, r *http.Request) {
 	// sign the token with secret key
 	tokenString, error := token.SignedString([]byte(os.Getenv("JWT_KEY")))
 	if error != nil {
-		fmt.Println(error)
+		w.WriteHeader(http.StatusBadRequest)
+		var resp = map[string]interface{}{"status": false, "message": "Problem signing token"}
+		log.Println(error.Error())
+		json.NewEncoder(w).Encode(resp)
+		return
 	}
 
 	var resp = map[string]interface{}{"status": true, "message": "logged in"}
@@ -113,10 +118,9 @@ func (u *User) CreateUser(w http.ResponseWriter, r *http.Request) {
 	user.Password = string(pass)
 
 	createdUser := u.db.Create(user)
-	var errMessage = createdUser.Error
 
-	if createdUser.Error != nil {
-		fmt.Println(errMessage)
+	if err := createdUser.Error; err != nil {
+		log.Println(err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		var resp = map[string]interface{}{"status": false, "message": "Failed to create user"}
 		json.NewEncoder(w).Encode(resp)
@@ -128,18 +132,82 @@ func (u *User) CreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (u *User) GetUserFromJWT(w http.ResponseWriter, r *http.Request) {
+func (u *User) getUserFromJWT(w http.ResponseWriter, r *http.Request) *models.User {
 	authUser := r.Context().Value("user").(*models.Token)
-
 	var user models.User
 	u.db.First(&user, "user_name = ?", authUser.Name)
+	return &user
+}
+
+func (u *User) GetURL(w http.ResponseWriter, r *http.Request) {
+	urlEntry := &models.Mapping{}
+	params := mux.Vars(r)
+	var userNameAndAlias = params["userAndAlias"]
+	if strings.Contains(userNameAndAlias, "-") {
+		s := strings.Split(userNameAndAlias, "-")
+		userName := s[0]
+		alias := s[1]
+		u.db.Where("user_name = ? AND alias = ?", userName, alias).First(&urlEntry)
+		if urlEntry.Url != "" {
+			http.Redirect(w, r, string(urlEntry.Url), http.StatusFound)
+		}
+	}
+
+	http.Error(w, "No such url exists", http.StatusNotFound)
+}
+
+// Create mock short url
+func (u *User) CreateURLTest(w http.ResponseWriter, r *http.Request) {
+	urlEntry := &models.Mapping{}
+	urlEntry.UserName = "test0"
+	urlEntry.Alias = "google"
+	urlEntry.Url = "https://google.com"
+	urlEntry.ExpirationDate = time.Now()
+	u.db.Create(urlEntry)
+	fmt.Println("created entry")
+	json.NewEncoder(w).Encode(urlEntry)
+}
+
+func (u *User) CreateURL(w http.ResponseWriter, r *http.Request) {
+	user := u.getUserFromJWT(w, r)
 	if user.ID == 0 {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnauthorized)
 		var resp = map[string]interface{}{"status": false, "message": "Username not found"}
 		json.NewEncoder(w).Encode(resp)
 		return
 	}
-	json.NewEncoder(w).Encode(user)
+	urlEntry := &models.Mapping{}
+	err := json.NewDecoder(r.Body).Decode(urlEntry)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		var resp = map[string]interface{}{"status": false, "message": "Request doesn't have required fields"}
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+	// Check URL is valid
+	if !utils.IsValidURL(u.URL) {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+	// Check alias is valid
+	if u.Alias != "" && !utils.IsValidAlias(u.Alias) {
+		http.Error(w, "Invalid Alias", http.StatusBadRequest)
+		return
+	}
+
+	urlEntry.UserName = user.UserName
+	// Expiration time set to 1 year
+	urlEntry.ExpirationDate = time.Now().AddDate(1, 0, 0)
+	createdUrlMapping := u.db.Create(urlEntry)
+
+	if err := createdUrlMapping.Error; err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+		var resp = map[string]interface{}{"status": false, "message": "Failed to create url entry"}
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+	json.NewEncoder(w).Encode(urlEntry)
 }
 
 func (u *User) FetchUsers(w http.ResponseWriter, r *http.Request) {

@@ -43,7 +43,9 @@ func (a *App) ConnectDb(username, password, databaseName, databaseHost string) {
 
 	// Migrate the schema
 	db.AutoMigrate(
-		&models.User{})
+		&models.User{},
+		&models.Mapping{},
+	)
 
 	fmt.Println("Successfully connected!", a.Db)
 }
