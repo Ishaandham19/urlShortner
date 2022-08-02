@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Ishaandham19/urlShortner/models"
+	"github.com/Ishaandham19/urlShortner/utils"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
@@ -184,13 +185,14 @@ func (u *User) CreateURL(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(resp)
 		return
 	}
+
 	// Check URL is valid
-	if !utils.IsValidURL(u.URL) {
+	if !utils.IsValidURL(urlEntry.Url) {
 		http.Error(w, "Invalid URL", http.StatusBadRequest)
 		return
 	}
 	// Check alias is valid
-	if u.Alias != "" && !utils.IsValidAlias(u.Alias) {
+	if urlEntry.Alias != "" && !utils.IsValidAlias(urlEntry.Alias) {
 		http.Error(w, "Invalid Alias", http.StatusBadRequest)
 		return
 	}
@@ -198,16 +200,29 @@ func (u *User) CreateURL(w http.ResponseWriter, r *http.Request) {
 	urlEntry.UserName = user.UserName
 	// Expiration time set to 1 year
 	urlEntry.ExpirationDate = time.Now().AddDate(1, 0, 0)
-	createdUrlMapping := u.db.Create(urlEntry)
 
-	if err := createdUrlMapping.Error; err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusBadRequest)
-		var resp = map[string]interface{}{"status": false, "message": "Failed to create url entry"}
+	// Check if alias already exists for given user
+	checkUrl := &models.Mapping{}
+	result := u.db.Where("user_name = ? AND alias = ?", urlEntry.UserName, urlEntry.Alias).First(&checkUrl)
+	if result.Error == gorm.ErrRecordNotFound {
+		createdUrlMapping := u.db.Create(urlEntry)
+		if err := createdUrlMapping.Error; err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusBadRequest)
+			var resp = map[string]interface{}{"status": false, "message": "Failed to create url entry"}
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		shortLink := r.Host + "/" + urlEntry.UserName + "-" + urlEntry.Alias
+		w.WriteHeader(http.StatusCreated)
+		var resp = map[string]interface{}{"status": true, "shortUrl": shortLink}
 		json.NewEncoder(w).Encode(resp)
+	} else {
+		log.Printf("url.id : %d, url.UserName: %s, url.Alias: %s", checkUrl.ID, checkUrl.UserName, checkUrl.Alias)
+		http.Error(w, "Alias already exists", http.StatusBadRequest)
 		return
 	}
-	json.NewEncoder(w).Encode(urlEntry)
 }
 
 func (u *User) FetchUsers(w http.ResponseWriter, r *http.Request) {

@@ -22,7 +22,7 @@ func Handlers(user *controllers.User) *mux.Router {
 	// Auth route
 	s := r.PathPrefix("/auth").Subrouter()
 	s.Use(auth.JwtVerify)
-	s.HandleFunc("/user", user.CreateURL).Methods("POST")
+	s.HandleFunc("/url", user.CreateURL).Methods("POST")
 	s.HandleFunc("/user", user.FetchUsers).Methods("GET")
 	s.HandleFunc("/user/{id}", user.UpdateUser).Methods("PUT")
 	s.HandleFunc("/user/{id}", user.DeleteUser).Methods("DELETE")

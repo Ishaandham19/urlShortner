@@ -6,7 +6,7 @@ import "time"
 type Mapping struct {
 	ID             uint
 	UserName       string
-	Alias          string
+	Alias          string `gorm:"uniqueIndex"`
 	Url            string
 	ExpirationDate time.Time
 }
