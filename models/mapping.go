@@ -5,8 +5,8 @@ import "time"
 //Token struct declaration
 type Mapping struct {
 	ID             uint
-	UserName       string
-	Alias          string `gorm:"uniqueIndex"`
+	UserName       string `gorm:"index:idx_member"`
+	Alias          string `gorm:"index:idx_member"`
 	Url            string
 	ExpirationDate time.Time
 }

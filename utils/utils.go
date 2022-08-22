@@ -58,5 +58,5 @@ func IsValidURL(str string) bool {
 // String has chars - alphabets, numbers, underscores
 func IsValidAlias(str string) bool {
 	valid, err := regexp.MatchString("^[A-Za-z0-9_]+$", str)
-	return valid && (err == nil)
+	return valid && (err == nil) && (len(str) < 50)
 }

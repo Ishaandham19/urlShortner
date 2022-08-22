@@ -1,7 +1,9 @@
-package utils
+package tests
 
 import (
 	"testing"
+
+	"github.com/Ishaandham19/urlShortner/utils"
 )
 
 func TestIsValidAlias(t *testing.T) {
@@ -28,7 +30,7 @@ func TestIsValidAlias(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			res := IsValidAlias(tc.str)
+			res := utils.IsValidAlias(tc.str)
 			if res != tc.val {
 				t.Errorf("For '%s', expected %t. Got %t instead.", tc.str, tc.val, res)
 			}
@@ -111,7 +113,7 @@ func TestIsValidURL(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			res := IsValidURL(tc.url)
+			res := utils.IsValidURL(tc.url)
 			if res != tc.val {
 				t.Errorf("For '%s', expected %t. Got %t instead.", tc.url, tc.val, res)
 			}

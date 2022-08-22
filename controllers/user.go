@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"errors"
+
 	"github.com/Ishaandham19/urlShortner/models"
 	"github.com/Ishaandham19/urlShortner/utils"
 	"github.com/golang-jwt/jwt"
@@ -24,6 +26,14 @@ type User struct {
 
 func NewUser(db *gorm.DB, l *log.Logger) *User {
 	return &User{db, l}
+}
+
+type urlResponse struct {
+	UserName       string
+	Alias          string
+	Url            string
+	ShortUrl       string
+	ExpirationDate time.Time
 }
 
 type ErrorResponse struct {
@@ -43,6 +53,7 @@ func (u *User) Login(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(curUser)
 
 	if err != nil {
+		log.Println("Unable to decode user")
 		w.WriteHeader(http.StatusBadRequest)
 		var resp = map[string]interface{}{"status": false, "message": "Invalid request"}
 		json.NewEncoder(w).Encode(resp)
@@ -52,6 +63,7 @@ func (u *User) Login(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	u.db.First(&user, "user_name = ?", curUser.UserName)
 	if user.ID == 0 {
+		log.Println("Unable to find username")
 		w.WriteHeader(http.StatusBadRequest)
 		var resp = map[string]interface{}{"status": false, "message": "Username not found"}
 		json.NewEncoder(w).Encode(resp)
@@ -81,6 +93,7 @@ func (u *User) Login(w http.ResponseWriter, r *http.Request) {
 	// sign the token with secret key
 	tokenString, error := token.SignedString([]byte(os.Getenv("JWT_KEY")))
 	if error != nil {
+		log.Println("Unable to sign jwt")
 		w.WriteHeader(http.StatusBadRequest)
 		var resp = map[string]interface{}{"status": false, "message": "Problem signing token"}
 		log.Println(error.Error())
@@ -90,9 +103,11 @@ func (u *User) Login(w http.ResponseWriter, r *http.Request) {
 
 	var resp = map[string]interface{}{"status": true, "message": "logged in"}
 
-	cookie := &http.Cookie{Name: "Authorization", Value: tokenString, Expires: expiresAt, HttpOnly: true}
-	http.SetCookie(w, cookie)
-	resp["token"] = tokenString // Store the token in the response
+	// FOr HTTP only cookie - Remove for now
+	// cookie := &http.Cookie{Name: "Authorization", Value: tokenString, Expires: expiresAt, HttpOnly: true}
+	// http.SetCookie(w, cookie)
+	resp["userName"] = user.UserName
+	resp["accessToken"] = tokenString
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
@@ -134,6 +149,8 @@ func (u *User) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (u *User) getUserFromJWT(w http.ResponseWriter, r *http.Request) *models.User {
+	js, _ := json.Marshal(r.Context().Value("user"))
+	log.Println(js)
 	authUser := r.Context().Value("user").(*models.Token)
 	var user models.User
 	u.db.First(&user, "user_name = ?", authUser.Name)
@@ -204,7 +221,7 @@ func (u *User) CreateURL(w http.ResponseWriter, r *http.Request) {
 	// Check if alias already exists for given user
 	checkUrl := &models.Mapping{}
 	result := u.db.Where("user_name = ? AND alias = ?", urlEntry.UserName, urlEntry.Alias).First(&checkUrl)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		createdUrlMapping := u.db.Create(urlEntry)
 		if err := createdUrlMapping.Error; err != nil {
 			log.Println(err)
@@ -220,18 +237,52 @@ func (u *User) CreateURL(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(resp)
 	} else {
 		log.Printf("url.id : %d, url.UserName: %s, url.Alias: %s", checkUrl.ID, checkUrl.UserName, checkUrl.Alias)
-		http.Error(w, "Alias already exists", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		var resp = map[string]interface{}{"status": false, "message": "Alias already exists!"}
+		json.NewEncoder(w).Encode(resp)
 		return
 	}
 }
 
-func (u *User) FetchUsers(w http.ResponseWriter, r *http.Request) {
-	var users []models.User
-	u.db.Find(&users)
-	json.NewEncoder(w).Encode(users)
+func (u *User) GetUser(w http.ResponseWriter, r *http.Request) {
+	user := u.getUserFromJWT(w, r)
+	if user.ID == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		var resp = map[string]interface{}{"status": false, "message": "Username not found"}
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+	var resp = map[string]interface{}{"status": true, "username": user.UserName, "message": "Username found"}
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (u *User) GetAllUrls(w http.ResponseWriter, r *http.Request) {
+	user := u.getUserFromJWT(w, r)
+	if user.ID == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		var resp = map[string]interface{}{"status": false, "message": "Username not found"}
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+	var userUrls []urlResponse
+	err := u.db.Table("mappings").Select("user_name", "url", "alias", "expiration_date").Where("user_name = ?", user.UserName).Order("alias, url").Find(&userUrls).Error
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		var resp = map[string]interface{}{"status": false, "message": "Error retrieving user urls"}
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	for i := 0; i < len(userUrls); i++ {
+		userUrls[i].ShortUrl = r.Host + "/" + userUrls[i].UserName + "-" + userUrls[i].Alias
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(&userUrls)
 }
 
 func (u *User) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	// TODO
 	user := &models.User{}
 	params := mux.Vars(r)
 	var id = params["id"]
@@ -242,6 +293,7 @@ func (u *User) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (u *User) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	// TODO
 	params := mux.Vars(r)
 	var id = params["id"]
 	var user models.User
