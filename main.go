@@ -20,10 +20,10 @@ func main() {
 	fmt.Println(e)
 
 	port := os.Getenv("PORT")
-	username := os.Getenv("databaseUser")
-	password := os.Getenv("databasePassword")
-	databaseName := os.Getenv("databaseName")
-	databaseHost := os.Getenv("databaseHost")
+	username := os.Getenv("DATABASE_USER")
+	password := os.Getenv("DATABASE_PASSWORD")
+	databaseName := os.Getenv("DATABASE_NAME")
+	databaseHost := os.Getenv("DATABASE_HOST")
 
 	// Connect to database
 	app := App{}

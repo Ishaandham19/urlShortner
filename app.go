@@ -38,9 +38,6 @@ func (a *App) ConnectDb(username, password, databaseName, databaseHost string) {
 		panic(err)
 	}
 
-	// Close db when not in use
-	// defer db.Close()
-
 	// Migrate the schema
 	db.AutoMigrate(
 		&models.User{},
