@@ -274,7 +274,7 @@ func (u *User) GetAllUrls(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := 0; i < len(userUrls); i++ {
-		userUrls[i].ShortUrl = r.Host + "/" + userUrls[i].UserName + "-" + userUrls[i].Alias
+		userUrls[i].ShortUrl = "shorturl.ishaandham.com" + "/" + userUrls[i].UserName + "-" + userUrls[i].Alias
 	}
 
 	w.WriteHeader(http.StatusOK)
