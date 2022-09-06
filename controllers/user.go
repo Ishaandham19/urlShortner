@@ -231,7 +231,7 @@ func (u *User) CreateURL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		shortLink := r.Host + "/" + urlEntry.UserName + "-" + urlEntry.Alias
+		shortLink := "shorturl.ishaandham.com" + "/" + urlEntry.UserName + "-" + urlEntry.Alias
 		w.WriteHeader(http.StatusCreated)
 		var resp = map[string]interface{}{"status": true, "shortUrl": shortLink}
 		json.NewEncoder(w).Encode(resp)
