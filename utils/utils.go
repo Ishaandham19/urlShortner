@@ -49,10 +49,13 @@ const (
 		`$`
 )
 
+const selfLink = "shorturl.ishaandham.com/.*"
+
 // String is valid url
 func IsValidURL(str string) bool {
-	valid, err := regexp.MatchString(urlRegex, str)
-	return valid && (err == nil)
+	valid_1, err_1 := regexp.MatchString(urlRegex, str)
+	valid_2, err_2 := regexp.MatchString(selfLink, str)
+	return (err_1 == nil && err_2 == nil) && (!valid_2 && valid_1)
 }
 
 // String has chars - alphabets, numbers, underscores

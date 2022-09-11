@@ -76,6 +76,8 @@ func TestIsValidURL(t *testing.T) {
 		"http://www.foo.bar./":         {url: "http://www.foo.bar.", val: true},
 		"http://a.b--c.de/":            {url: "http://a.b--c.de/", val: true},
 		// Should not match
+		"http://shorturl.ishaandham.com/ishaan-web": {url: "http://shorturl.ishaandham.com/ishaan-web", val: false},
+		"http://www.shorturl.ishaandham.com/alias":  {url: "http://shorturl.ishaandham.com/ishaan-web", val: false},
 		"http://":    {url: "http://", val: false},
 		"http://.":   {url: "http://.", val: false},
 		"http://..":  {url: "http://..", val: false},
