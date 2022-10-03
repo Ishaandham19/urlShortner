@@ -3,7 +3,7 @@
 `urlShortner` - A backend that supports creation of personalized short urls.
 
 Add image of app below
-![Shallow Backup GIF Demo](https://ishaandham.com/static/media/blogApp.0d9279d2.png)
+![Shallow Backup GIF Demo](https://ishaandham.com/static/media/urlShortner.63de7acb.png)
 
 Contents
 ========
