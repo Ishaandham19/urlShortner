@@ -1,8 +1,6 @@
 # urlShortner
 
-# shallow-backup
-
-`urlShortner` <add short descripttion>
+`urlShortner` - A backend that supports creation of personalized short urls.
 
 Add image of app below
 ![Shallow Backup GIF Demo](img/shallow-backup-demo.gif)
@@ -11,23 +9,21 @@ Contents
 ========
 
  * [Why?](#why)
- * [Installation](#installation)
  * [Usage](#usage)
- * [Git Integration](#git-integration)
- * [What can I back up?](#what-can-i-back-up)
- * [Configuration](#configuration)
- * [Output Structure](#output-structure)
- * [Reinstalling Dotfiles](#reinstalling-dotfiles)
+ * [Components](#components)
+ * [Installation](#installation)
  * [Want to contribute?](#want-to-contribute)
 
 ### Why?
 
-<talk about why>
+Most of the url shortner applications available online do not allow you to create custom short urls without buying a subscription. This motivated me to create a backend that allows users to create an account and manage their custom urls.
 
 ### Usage
----
 
-<talk about public version online>
+There is a public web app available for use - [short url](https://shorturl.ishaandham.com/app/).
+
+### Components
+
 
 
 ### Installation/Deployment
