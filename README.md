@@ -1,6 +1,6 @@
 # urlShortner
 
-`urlShortner` - A backend that supports creation of personalized short urls.
+`urlShortner` - An application that supports creation of personalized short urls.
 
 ![Shallow Backup GIF Demo](website.png)
 
